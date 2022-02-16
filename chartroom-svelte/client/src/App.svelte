@@ -25,20 +25,20 @@
 
 
 	let VARIANTS = [
-		'BIONIC', 'ORGANIC', 'DIVINE', 'QUANT', 'COSMIC'
+		'BIONIC', 'ORGANIC', 'DIVINE', 'QUANTUM', 'COSMIC'
 	];
 
 	let MINERAL = [
 		"THC", "Amethyst", "LSD", "Plutonium", "Azurescens",
 		"Exaltium", "Graviton", "Vitalize", "DMT", "Emerald",
-		"Meteorite", "Jade", "Mercury", "Dex", "Orichalcum",
+		"Meteor", "Jade", "Mercury", "Dex", "Orichalcum",
 		"Mythril", "Vulcan", "Titanium", "Einsteinium", "Loop",
 	]
 
 	let unboundTokens = [
 		// Essences || variant
 		...VARIANTS,
-		...MINERAL
+		...MINERAL.map(e => e.toUpperCase())
 	];
 	let unboundTokensSymbolsData = [
 		 makeYahToken("THC", "THC"),
@@ -56,16 +56,16 @@
 		 makeYahToken("AZURESCENS", "AZUR"),
 		 makeYahToken("GRAVITON", "GRAV"),
 		 makeYahToken("EMERALD", "EMRLD"),
-		 makeYahToken("ORGANIC", "ORGAN"),
 		 makeYahToken("TITANIUM", "TITAN"),
 		 makeYahToken("PLUTONIUM", "PLUTO"),
 		 makeYahToken("EXALTIUM", "EXALT"),
 		 makeYahToken("EINSTEINIUM", "EINST"),
 		 makeYahToken("AMETHYST", "AMTHY"),
+		 makeYahToken("ORGANIC", "ORGAN"),
 		 makeYahToken("BIONIC", "BIONIC"),
 		 makeYahToken("DIVINE", "DIVINE"),
 		 makeYahToken("COSMIC", "COSMIC"),
-		 makeYahToken("QUANT", "QUANT"), 
+		 makeYahToken("QUANTUM", "QUANTUM"), 
 	];
 
 	let landsPerToken = [];
@@ -114,12 +114,16 @@
 	};
 
 	async function getGlobalTotalLandsData() {
+
 		let getTotalLandsUrl = api_url + "atomicassets/v1/schemas/terraformers/exp1.lands/stats";
-		await apiCall(getTotalLandsUrl).then( r => {
+		return await apiCall(getTotalLandsUrl)
+		.then( r => {
 			console.log('totalLandsActive Lands => ', r );
 			api_data_total_lands = r;
 			TOTAL_LANDS =  to_number(r.data.assets) + to_number(r.data.burned);
+			return r;
 		});
+
 
 	}
 
@@ -127,45 +131,72 @@
 		landsPerToken = [];
 		let page = 1;
 		let getTotalLandsPerTokenUrl = api_url + "atomicassets/v1/templates?collection_name=terraformers&schema_name=exp1.lands&page=" + page.toString() + "&limit=1000";
-		apiCall(getTotalLandsPerTokenUrl).then( r => {
+		return await apiCall(getTotalLandsPerTokenUrl).then( r => {
 			api_data_total_lands_per_token = r;
-			unboundTokens.forEach( (token, index) => {
-				if ( !landsPerToken[token] ) {
-					landsPerToken[token] = {
+			unboundTokensSymbolsData.forEach( (token, index) => {
+				if ( !landsPerToken[token.name] ) {
+					landsPerToken[token.name] = {
 						token,
 						totalLands: 0,
 						miningPower: 0,
 					}
 				}
-				let per_token = r.data.filter( template => template.immutable_data.mineral === token);
+				let per_token = r.data.map( template => template.immutable_data.mineral === token.name);
 
+				console.log('ON COMPARE', {
+					a_token_name: token.name,
+					b_assets_pet_token: per_token,
+				});
+				
+				
+				
 
-
-				per_token.forEach( (template,) => {
+				per_token.length > 0 && per_token.forEach( (template) => {
 					if ( template.issued_supply > 0) {
-						landsPerToken[token].totalLands += to_number(template.issued_supply);
-					}
-					if (template.immutable_data['mining power']) {
-						landsPerToken[token].miningPower += Math.round(template.immutable_data['mining power'].toFixed(2) * 100) /100 ;
-					}
-					if (template.immutable_data['variant']) {
-						let v = JSON.stringify(template.immutable_data['variant']).replaceAll("\"", "");
-						if (landsPerToken.filter(tokenData => tokenData.token === v).length !== 0) {
-							landsPerToken.filter(tokenData => tokenData.token === v)[0].totalLands += to_number(template?.issued_supply);	
-							landsPerToken.filter(tokenData => tokenData.token === v)[0].miningPower += Math.round(template.immutable_data['mining power'].toFixed(2) * 100) /100 ;
+							landsPerToken[token.name].totalLands += to_number(template.issued_supply);
+					
+							let currentUnboundToken = unboundTokensSymbolsData.find(tok => tok.name === token.name);
+							currentUnboundToken ? currentUnboundToken.TL = to_number(landsPerToken[token.name].totalLands) : -10;
+						
+						if (template.immutable_data['mining power']) {
+							landsPerToken[token.name].miningPower += Math.round(template.immutable_data['mining power'].toFixed(2) * 100) /100 ;
+						}
+						if (template.immutable_data.variant) {
+							let v = template.immutable_data.variant.toUpperCase();
+
+							
+							let currentVariantToken = unboundTokensSymbolsData.find(tok => tok.name === v);
+							
+							if (["QUANTUM", "COSMIC"].includes(v)) {
+								console.log('%c NOT IN TABLE VARIANTS ', 'color:pink', {
+									v
+								});
+							}
+
+							if (!MINERAL.includes(template.immutable_data.mineral.toUpperCase())) {
+								console.log('%c NOT IN TABLE VARIANTS ', 'color:green', {
+									v,
+									mineral: template.immutable_data.mineral.toUpperCase(),
+									cd: MINERAL.includes(template.immutable_data.mineral.toUpperCase()),
+								});
+							}
+							currentVariantToken && ["QUANTUM", "COSMIC"].includes(currentVariantToken.sym) ? currentVariantToken.TL += to_number(template.issued_supply) : null;
+							currentVariantToken && ["QUANTUM", "COSMIC"].includes(currentVariantToken.sym) ? currentVariantToken.TMP += to_number( template.immutable_data['mining power'].toFixed(2)) : null; 
+							
+							if (landsPerToken.filter(tokenData => tokenData.token === v).length !== 0) {
+								landsPerToken.filter(tokenData => tokenData.token === v)[0].totalLands += to_number(template?.issued_supply);	
+								landsPerToken.filter(tokenData => tokenData.token === v)[0].miningPower += Math.round(template.immutable_data['mining power'].toFixed(2) * 100) /100 ;
+							}
 						}
 					}
-				})
-				let minePowerToken = landsPerToken[token] ? landsPerToken[token].miningPower : 0;
-				minePowerToken = Math.trunc(minePowerToken *100) /100;
-
-			
-			
+				})	
 			})
-			landsPerToken.forEach( token => {			
-				totalLandsActive += token.totalLands ? token.totalLands : 0;
-				totalMinPow += token.mining_power ? token.mining_power : 0; // using rpc
-			
+			unboundTokensSymbolsData.forEach( token => {
+				if (!VARIANTS.includes(token.name)) {
+					totalLandsActive += token.TL ? token.TL : 0;
+					totalMinPow += to_number(token.TMP ? token.TMP : 0); // using rpc
+				}	
+
 			});
 
 			console.log('Verif Array totalLandsActive ', {
@@ -173,19 +204,23 @@
 				totalLandsActive, totalMinPow,
 				page, unboundTokensSymbolsData,
 			});
-			
+			return r;
 		});
 
 	}
-	async function init() {
-		await initRPC();
-		await getGlobalTotalLandsData();
-		await getTotalLandsPerTokenData();
 
+	async function init() {
+		let ret = [];
+		ret.push(await initRPC());
+		ret.push(await getGlobalTotalLandsData());
+		console.log('Run async await TL/Token', ret);
+		ret.push(await getTotalLandsPerTokenData());
+		console.log('After async await TL/Token', ret);
+		return ret;
 	};
 	// ON INIT EQUIVALENT
 	onMount( async() => {
-		init();
+		// await init();
 
 	});
 </script>
@@ -236,51 +271,78 @@
 				<thead>
 					<th>Index</th>
 					<th>Symbol</th>
-					<th>Mineral</th> 
-					<th>Lands (active)</th>
-					<th>Mining Power (active)</th> 
-					<th>% of Total MiningPower (active)</th>
-					<!-- <th>Total Lands (active + burned)</th> -->
+					<th>Mineral & Variants</th> 
+					<th>Lands (minted)</th>
+					<th>Mining Power (minted)</th> 
+					<th>% of Total MiningPower (minted)</th>
+					<!-- <th>Total Lands (minted + burned)</th> -->
 				</thead>
 				<tbody>
 
-
-							
+					{#key unboundTokensSymbolsData}
 						{#each unboundTokensSymbolsData as token}
-							<tr>	
-								<td> { unboundTokensSymbolsData.findIndex(tok => token === tok ) + 1 } </td>
-								<td> {token.sym} </td>
-								<td> {token.name} </td>
-
-								<!-- what is should look like-->
-								
-								<td> {token.TL} </td> 
-								<td> {token.TMP} </td>
-								<!-- 
-								<td> {(token.TMP / global.TMP).toFixed(2)} % </td>
-								<td> {token.TAC} </td>
-								<td> {token.TE} </td>
-								<td> {token.TWB} </td>
-								 -->
-
-
-
-								{#each landsPerToken as data }
-								<td> { data.totalLands } </td>
-								<td> { data.mining_power  } </td>
-								<td> { ((data.miningPower / (totalMinPow)) * 100).toFixed(2) } % </td>
-								{/each}
-							</tr>	
+						{#if VARIANTS.includes(token.name)}
+							<tr class="variant">
+							<td> { unboundTokensSymbolsData.findIndex(tok => token === tok ) + 1 } </td>	
+							<td> {token.sym} </td>
+							<td> {token.name} </td>
 							
-						{/each}
+							<!-- what is should look like-->
+							
+							<td> {token.TL ? token.TL : landsPerToken.find(t => t.token === token.name)?.totalLands } </td> 
+							<td> { Math.round(token.TMP).toFixed(2) } </td>
+							<td> {(100*token.TMP / totalMinPow).toFixed(2)} % </td>
+							<!-- 
+								<td> {token.TAC} </td>
+							<td> {token.TE} </td>
+							<td> {token.TWB} </td>
+							-->
+
+							
+
+							<!-- {#each landsPerToken as data }
+							<td> { data.totalLands } </td>
+							<td> { data.mining_power  } </td>
+							<td> { ((data.miningPower / (totalMinPow)) * 100).toFixed(2) } % </td>
+							{/each} -->
+						</tr>
+						{:else }	
+						<tr class="Minerals">	
+						
+							<td> { unboundTokensSymbolsData.findIndex(tok => token === tok ) + 1 } </td>
+							
+							<td> {token.sym} </td>
+							<td> {token.name} </td>
+
+							<!-- what is should look like-->
+							
+							<td> {token.TL} </td> 
+							<td> { ( Math.round( (token.TMP) * 100 ) / 100).toFixed(2) } </td>
+							<td> {(100*token.TMP / totalMinPow).toFixed(2)} % </td>
+							<!--
+							<td> {token.TAC} </td>
+							<td> {token.TE} </td>
+							<td> {token.TWB} </td>
+								-->
+						</tr>
+						{/if}
+					{/each}
+					{/key}
+							
+
 						<!-- {#if (undefined !== api_data_total_lands && api_data_total_lands.success === true ) }  -->
 						<tr class="table_footer">
-							<td>ALL</td>
-							<td> { totalLandsActive }
-								<hr>{ totalLandsActive + to_number(api_data_total_lands?.data.burned) } (all)
+							<td>ALL <br> Minerals <br> Only</td>
+							<td> <span class="spacer"></span> </td>
+							<td> <span class="spacer"></span> </td>
+
+							<td> 
+								(minted) <hr> { totalLandsActive + 39 } 
+								<hr><br><hr> 
+								(all = minted + burned) <hr> { totalLandsActive + to_number(api_data_total_lands?.data.burned) + 39} 
 							</td>
 							<td> 
-								{ totalMinPow }								
+								{ totalMinPow.toFixed(2) }								
 							</td>
 							<td> 100 % </td>
 							<!-- <td> { data.} </td> -->
@@ -309,6 +371,28 @@
 		text-transform: uppercase;
 		font-size: 4em;
 		font-weight: 100;
+	}
+
+	.variant {
+		background-color: rgb(87, 73, 73); 
+		color: lightblue;
+		font-weight: bolder;
+		font-size: large;
+	}
+
+	.Minerals {
+		background-color: rgba(25, 175, 185, 0.575); 
+		text-decoration-color: #ff3e00 1px;
+		color: rgb(0, 0, 0);
+		font-weight: bolder;
+		font-size: large;
+	}
+
+	th {
+		background-color: rgba(3, 109, 12, 0.767); 
+		color: rgb(0, 0, 0);
+		font-weight: 3rem;
+		font-size: larger;
 	}
 
 	@media (min-width: 640px) {
