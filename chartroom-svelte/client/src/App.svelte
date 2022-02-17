@@ -65,7 +65,7 @@
 		 makeYahToken("BIONIC", "BIONIC"),
 		 makeYahToken("DIVINE", "DIVINE"),
 		 makeYahToken("COSMIC", "COSMIC"),
-		 makeYahToken("QUANTUM", "QUANTUM"), 
+		 makeYahToken("QUANTUM", "QUANT"), 
 	];
 
 	let landsPerToken = [];
@@ -141,17 +141,26 @@
 						miningPower: 0,
 					}
 				}
-				let per_token = r.data.map( template => template.immutable_data.mineral === token.name);
+				let mineral_per_tokenMap = r.data.map( template => template.immutable_data.mineral?.toUpperCase() === token.name);
+				let mineral_per_token = r.data.filter( template => template.immutable_data.mineral?.toUpperCase() === token.name);
+				let variant_per_tokenMap = r.data.map( template => template.immutable_data.variant?.toUpperCase() === token.name);
+				let variant_per_token = r.data.filter( template => template.immutable_data.variant?.toUpperCase() === token.name);
 
 				console.log('ON COMPARE', {
 					a_token_name: token.name,
-					b_assets_pet_token: per_token,
+					b_assets_per_token: mineral_per_tokenMap,
+					mineral_per_token, foundNumberMineral: mineral_per_token.length,
+					c_assets_per_token: variant_per_tokenMap,
+					variant_per_token, foundNumberVariants: variant_per_token.length,
 				});
 				
 				
-				
+				if (mineral_per_token.length === 0) {
+					token.TL = 0
+				}
 
-				per_token.length > 0 && per_token.forEach( (template) => {
+				if ( mineral_per_token.length > 0 ) {
+					mineral_per_token.forEach( (template) => {
 					if ( template.issued_supply > 0) {
 							landsPerToken[token.name].totalLands += to_number(template.issued_supply);
 					
@@ -167,17 +176,17 @@
 							
 							let currentVariantToken = unboundTokensSymbolsData.find(tok => tok.name === v);
 							
-							if (["QUANTUM", "COSMIC"].includes(v)) {
-								console.log('%c NOT IN TABLE VARIANTS ', 'color:pink', {
+							if (VARIANTS.includes(v)) {
+								console.log('%c variant is iN TABLE VARIANTS ', 'color:pink', {
 									v
 								});
 							}
 
-							if (!MINERAL.includes(template.immutable_data.mineral.toUpperCase())) {
-								console.log('%c NOT IN TABLE VARIANTS ', 'color:green', {
+							if (!VARIANTS.includes(template.immutable_data.variant.toUpperCase())) {
+								console.log('%c Variant NOT IN TABLE VARIANTS ', 'color:green', {
 									v,
 									mineral: template.immutable_data.mineral.toUpperCase(),
-									cd: MINERAL.includes(template.immutable_data.mineral.toUpperCase()),
+									cd: !VARIANTS.includes(template.immutable_data.mineral.toUpperCase()),
 								});
 							}
 							currentVariantToken && ["QUANTUM", "COSMIC"].includes(currentVariantToken.sym) ? currentVariantToken.TL += to_number(template.issued_supply) : null;
@@ -189,8 +198,9 @@
 							}
 						}
 					}
-				})	
-			})
+					})
+				}
+
 			unboundTokensSymbolsData.forEach( token => {
 				if (!VARIANTS.includes(token.name)) {
 					totalLandsActive += token.TL ? token.TL : 0;
@@ -206,6 +216,7 @@
 			});
 			return r;
 		});
+	})	
 
 	}
 
